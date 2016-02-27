@@ -1,13 +1,19 @@
 defmodule Lakeland.Mixfile do
   use Mix.Project
 
+  @dialyzer_configs [
+    plt_add_apps: [:eprof]
+  ]
+
   def project do
     [app: :lakeland,
      version: "0.0.1",
      elixir: "~> 1.2",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps]
+     deps: deps,
+     dialyzer: @dialyzer_configs
+    ]
   end
 
   # Configuration for the OTP application
@@ -15,7 +21,7 @@ defmodule Lakeland.Mixfile do
   # Type "mix help compile.app" for more information
   def application do
     [applications: [:logger],
-     mod: {Lakeland, []}]
+     mod: {Lakeland.App, []}]
   end
 
   # Dependencies can be Hex packages:
@@ -28,6 +34,8 @@ defmodule Lakeland.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+    [
+      {:dialyxir, "~> 0.3", only: [:dev]}
+    ]
   end
 end

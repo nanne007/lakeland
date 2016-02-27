@@ -1,20 +1,10 @@
-# Lakeland
+## Lakeland
 
-**TODO: Add description**
+### Description
 
-## Installation
+Lakeland is an almost word-by-word copycat of erlang library [Ranch](https://github.com/ninenines/ranch).
+For now, this repo is just for the purpose of learning elixir and erlang.
+Any sugguestion is appreciated.
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed as:
-
-  1. Add lakeland to your list of dependencies in `mix.exs`:
-
-        def deps do
-          [{:lakeland, "~> 0.0.1"}]
-        end
-
-  2. Ensure lakeland is started before your application:
-
-        def application do
-          [applications: [:lakeland]]
-        end
-
+Lakeland is an elixir mix project.
+After cloning it, you can simply run `mix deps.get` and `mix compile`.

@@ -3,7 +3,7 @@
 ### Description
 
 Lakeland is an almost word-by-word copycat of erlang library [Ranch](https://github.com/ninenines/ranch).
-For now, this repo is just for the purpose of learning elixir and erlang.
+For now, this repo is just for the purpose of learning elixir and erlang and **in heavy development.**
 Any sugguestion is appreciated.
 
 Lakeland is an elixir mix project.

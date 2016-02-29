@@ -1,5 +1,9 @@
 defmodule Lakeland.Supervisor do
   use Supervisor
+  @moduledoc """
+  Lakeland root supervisor.
+  """
+
 
   def start_link() do
     Supervisor.start_link(__MODULE__, [], name: __MODULE__)

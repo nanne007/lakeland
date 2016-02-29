@@ -7,38 +7,38 @@ defmodule Lakeland do
   | {:socket, term}
   @type ref :: term
 
+  @doc """
+  Start listener `ref` with `nb_acceptors`.
+  """
   @spec start_listener(ref, non_neg_integer, module, Keyword.t, module, Keyword.t) :: Supervisor.on_start_child
   def start_listener(ref, nb_acceptors,
-                     transport_mod, transport_opts,
-                     protocol_mod, protocol_opts)
-  when is_integer(nb_acceptors) and is_atom(transport_mod) and is_atom(protocol_mod) do
-    {:module, ^transport_mod} = Code.ensure_loaded(transport_mod)
+                     transport, transport_opts,
+                     protocol, protocol_opts)
+  when is_integer(nb_acceptors) and is_atom(transport) and is_atom(protocol) do
+    {:module, ^transport} = Code.ensure_loaded(transport)
 
     ## TODO: Remove in 2.0 and simply require ssl.
-    _ = ensure_ssl(transport_mod)
+    _ = ensure_ssl(transport)
 
-    case function_exported?(transport_mod, :name, 0) do
+    case function_exported?(transport, :name, 0) do
       false ->
         {:error, :badarg}
       true ->
-        import Supervisor.Spec
-        listener_sup_args = [ref, nb_acceptors, transport_mod, transport_opts, protocol_mod, protocol_opts]
-        child_spec = supervisor(Lakeland.Listener.Supervisor, listener_sup_args,
-                                id: {Lakeland.Listener.Supervisor, ref})
-        res = Supervisor.start_child(Lakeland.Supervisor, child_spec)
         socket = transport_opts |> Keyword.get(:socket, nil)
+        child_spec = child_spec(ref, nb_acceptors, transport, transport_opts, protocol, protocol_opts)
+
+        res = Supervisor.start_child(Lakeland.Supervisor, child_spec)
         case res do
           {:ok, pid} when socket != nil ->
             ## Give the ownership of the socket to Lakeland.Acceptor.Supervisor
             ## to make sure the socket stays open as long as the listener is alive.
             ## If the socket closes however there will be no way to recover
             ## because we don't know how to open it again.
-            children = Supervisor.which_children(pid)
-            {_id, acceptor_sup, _type, _module} = children |> List.keyfind(Lakeland.Acceptor.Supervisor, 0)
-            ## NOTE: the catch is here because ssl crashes
-            ## when changing the controlling process of a listen socket because of a bug.
-            ## The bug will be fixed in R16.
-            transport_mod.controlling_process(socket, acceptor_sup)
+            {_id, acceptor_sup, _type, _module} =
+              pid |> Supervisor.which_children() |> List.keyfind(Lakeland.Acceptor.Supervisor, 0)
+            ## NOTE: when changing the controlling process of a listen socket because of a bug.
+            ## only deal with the happy path.
+            :ok = transport.controlling_process(socket, acceptor_sup)
           _ ->
             :ok
         end
@@ -46,12 +46,15 @@ defmodule Lakeland do
     end
   end
 
-  @spec stop_listener(ref) :: :ok | {:error, :not_found}
-  def stop_listener(ref) do
-    ## TODO: implement it
+  defp child_spec(ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts) do
+    import Supervisor.Spec
+    listener_sup_args = [ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts]
+    child_spec = supervisor(Lakeland.Listener.Supervisor, listener_sup_args,
+                            id: {Lakeland.Listener.Supervisor, ref})
   end
 
-  defp ensure_ssl(transport_mod) do
-    ## TODO: implement it
+
+  defp ensure_ssl(_transport) do
+    :ok
   end
 end

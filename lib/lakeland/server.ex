@@ -1,5 +1,8 @@
 defmodule Lakeland.Server do
   use GenServer
+  @moduledoc """
+  #{__MODULE__} is an frontend of the lakeland_server ets table.
+  """
 
   @table :lakeland_server
 
@@ -8,14 +11,17 @@ defmodule Lakeland.Server do
     monitors: [{{reference(), pid()}, term()}]
   }
 
+  @doc """
+  When started, it's registered as name: `#{__MODULE__}`
+  """
   @spec start_link() :: {:ok, pid}
   def start_link() do
-    GenServer.start_link(__MODULE__, [])
+    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
   end
 
   @spec set_new_listener_opts(Lakeland.ref, Lakeland.max_conns, term) :: :ok
-  def set_new_listener_opts(ref, max_conns, opts) do
-    :ok = GenServer.call(__MODULE__, {:set_new_listener_opts, ref, max_conns, opts})
+  def set_new_listener_opts(ref, max_conns, protocol_opts) do
+    :ok = GenServer.call(__MODULE__, {:set_new_listener_opts, ref, max_conns, protocol_opts})
     :ok
   end
 
@@ -60,14 +66,14 @@ defmodule Lakeland.Server do
     :ets.lookup_element(@table, {:max_conns, ref}, 2)
   end
 
-  @spec set_protocol_options(Lakeland.ref, term) :: :ok
-  def set_protocol_options(ref, opts) do
+  @spec set_protocol_opts(Lakeland.ref, term) :: :ok
+  def set_protocol_opts(ref, opts) do
     :ok = GenServer.call(__MODULE__, {:set_opts, ref, opts})
     :ok
   end
 
-  @spec get_protocol_options(Lakeland.ref) :: term
-  def get_protocol_options(ref) do
+  @spec get_protocol_opts(Lakeland.ref) :: term
+  def get_protocol_opts(ref) do
     :ets.lookup_element(@table, {:opts, ref}, 2)
   end
 
@@ -80,7 +86,7 @@ defmodule Lakeland.Server do
 
   # gen_server callback
 
-  def init([]) do
+  def init({}) do
     # recover from ets.
     monitors = for [ref, pid] <- :ets.match(@table, {{:conn_sup, "$1"}, "$2"}) do
       {{Process.monitor(pid), pid}, ref}

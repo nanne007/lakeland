@@ -17,8 +17,8 @@ defmodule Lakeland.Listener.Supervisor do
     shutdown = transport_opts |> Keyword.get(:shutdown, 5000)
 
     children = [
-      supervisor(Lakeland.Connection.Supervisor, [
-            ref, connection_type, shutdown, transport, ack_timeout, protocol
+      worker(Lakeland.Connection.Manager, [
+            ref, connection_type, shutdown, ack_timeout,transport, protocol
           ]),
       supervisor(Lakeland.Acceptor.Supervisor, [
             ref, num_of_acceptors, transport, transport_opts

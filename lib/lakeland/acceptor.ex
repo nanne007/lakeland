@@ -14,7 +14,7 @@ defmodule Lakeland.Acceptor do
           :ok ->
             # this call will not return until process has been started
             # and we are below the maximum number of connections
-            Lakeland.Connection.Supervisor.start_protocol(conn_sup, conn_socket)
+            _res = Lakeland.Connection.Supervisor.start_protocol(conn_sup, conn_socket)
           {:error, _} ->
             transport.close(conn_socket)
         end

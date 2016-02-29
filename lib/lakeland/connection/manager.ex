@@ -12,23 +12,24 @@ defmodule Lakeland.Connection.Manager do
     transport: nil,
     protocol: nil,
     protocol_opts: nil,
+    max_conns: nil,
     sleepers: [],
     handler_sup: nil
 #    ack_timeout: nil,
-#    max_conns: nil
   ]
   @type t :: %__MODULE__{
 #    parent: nil | pid,
     ref: Lakeland.ref,
 #    conn_type: conn_type,
 #    shutdown: shutdown,
-    transport: nil | module,
-    protocol: nil | module,
+    transport: module,
+    protocol: module,
     protocol_opts: term,
+    max_conns: Lakeland.max_conns,
     sleepers: [pid],
     handler_sup: pid
  #   ack_timeout: timeout,
- #   max_conns: nil | Lakeland.max_conns
+
   }
 
   @spec start_link(Lakeland.ref, conn_type, shutdown, timeout, module, module) :: GenServer.on_start
@@ -37,9 +38,16 @@ defmodule Lakeland.Connection.Manager do
   end
 
   def start_protocol(manager, socket) do
-    caller = Kernel.self
-    :ok = manager |> GenServer.call({:start_protocol, caller, socket})
-    :ok
+    case manager |> GenServer.call({:start_protocol, socket}) do
+      :ok -> :ok
+      {:ok, :sleep} ->
+        receive do
+          ^manager ->
+            :ok
+        end
+      {:error, _reason} = error ->
+        error
+    end
   end
 
 
@@ -48,25 +56,28 @@ defmodule Lakeland.Connection.Manager do
 
     Lakeland.Server.set_connection_sup(ref, Kernel.self)
 
-    _max_conns = Lakeland.Server.get_max_connections(ref)
+    max_conns = Lakeland.Server.get_max_connections(ref)
     protocol_opts = Lakeland.Server.get_protocol_opts(ref)
     state = %__MODULE__{
       ref: ref,
       transport: transport,
       protocol: protocol,
       protocol_opts: protocol_opts,
+      max_conns: max_conns,
       sleepers: [],
       handler_sup: handler_sup
     }
     {:ok, state}
   end
 
-  def handle_call({:start_protocol, caller, socket}, _from,
+  def handle_call({:start_protocol, socket}, from,
                   %__MODULE__{
                     ref: ref,
                     transport: transport,
                     protocol: protocol,
                     protocol_opts: protocol_opts,
+                    max_conns: max_conns,
+                    sleepers: sleepers,
                     handler_sup: handler_sup
                   } = state) do
 
@@ -77,28 +88,66 @@ defmodule Lakeland.Connection.Manager do
           "#{protocol}.start_link/4 crashed with reason: #{reason}\n")
         {:reply, error, state}
       {:ok, child} when child != :undefined ->
+        # monitor the handler in order to receive exit signal to release sleeped acceptors
+        Process.monitor(child)
         case transport.controlling_process(socket, child) do
-          :ok ->
-            Kernel.send(child, {:shoot, ref, transport, socket})
-            {:reply, :ok, state}
           {:error, _reason} = error ->
             transport.close(socket)
             _res = handler_sup |> Supervisor.terminate_child(child)
             {:reply, error, state}
-        end
-      {:ok, child, _info} when child != :undefined ->
-        case transport.controlling_process(socket, child) do
           :ok ->
             Kernel.send(child, {:shoot, ref, transport, socket})
-
-            {:reply, :ok, state}
+            if (cur_conns(handler_sup) < max_conns) do
+              {:reply, :ok, state}
+            else
+              {:reply, {:ok, :sleep},
+               %{state | sleepers: [from|sleepers]}
+              }
+            end
+        end
+      {:ok, child, _info} when child != :undefined ->
+        Process.monitor(child)
+        case transport.controlling_process(socket, child) do
           {:error, _reason} = error ->
             transport.close(socket)
-           _res =  handler_sup |> Supervisor.terminate_child(child)
+            _res = handler_sup |> Supervisor.terminate_child(child)
             {:reply, error, state}
+          :ok ->
+            Kernel.send(child, {:shoot, ref, transport, socket})
+            if (cur_conns(handler_sup) < max_conns) do
+              {:reply, :ok, state}
+            else
+              {:reply, {:ok, :sleep},
+               %{state | sleepers: [from | sleepers]}
+              }
+            end
         end
     end
   end
+
+  def handler_info({:DOWN, _ref, :process, _handler_pid, _reason},
+                   %__MODULE__{
+                     sleepers: sleepers
+                   } = state) when length(sleepers) == 0 do
+    ## TODO: report child down message
+    {:noreply, state}
+  end
+  def handler_info({:DOWN, _ref, :process, _handler_pid, _reason},
+                   %__MODULE__{
+                     sleepers: sleepers
+                   } = state) do
+    ## TODO: report child down message
+    [caller | remained_sleepers] = sleepers
+    Kernel.send(caller, Kernel.self)
+    {:noreply, %{state | sleepers: remained_sleepers}}
+  end
+
+
+  defp cur_conns(handler_sup) do
+    # currently, return the number of active children
+    handler_sup |> Supervisor.count_children |> Map.fetch!(:active)
+  end
+
 
 
   #   @doc """

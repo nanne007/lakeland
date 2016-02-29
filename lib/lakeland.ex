@@ -49,7 +49,7 @@ defmodule Lakeland do
   defp child_spec(ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts) do
     import Supervisor.Spec
     listener_sup_args = [ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts]
-    child_spec = supervisor(Lakeland.Listener.Supervisor, listener_sup_args,
+    supervisor(Lakeland.Listener.Supervisor, listener_sup_args,
                             id: {Lakeland.Listener.Supervisor, ref})
   end
 

@@ -9,8 +9,8 @@ defmodule Lakeland.Transport do
   @callback listen(opts) :: {:ok, socket} | {:error, atom}
   @callback accept(socket, timeout) :: {:ok, socket} | {:error, :closed | :timeout | atom}
   @callback accept_ack(socket, timeout) :: :ok
-  @callback connect(String.t, :inet.port_number, opts) :: {:ok, socket} | {:error, atom}
-  @callback connect(String.t, :inet.port_number, opts, timeout) :: {:ok, socket} | {:error, atom}
+  @callback connect(term, :inet.port_number, opts) :: {:ok, socket} | {:error, atom}
+  @callback connect(term, :inet.port_number, opts, timeout) :: {:ok, socket} | {:error, atom}
   @callback recv(socket, non_neg_integer, timeout) :: {:ok, term} | {:error, :closed | :timeout | atom}
   @callback send(socket, iodata) :: :ok | {:error, atom}
   @callback sendfile(socket, Path.t | File.io_device) :: {:ok, non_neg_integer} | {:error, atom}

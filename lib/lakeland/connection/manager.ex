@@ -9,32 +9,31 @@ defmodule Lakeland.Connection.Manager do
     ref: nil,
 #    conn_type: nil,
 #    shutdown: nil,
+    ack_timeout: nil,
     transport: nil,
     protocol: nil,
     protocol_opts: nil,
     max_conns: nil,
     sleepers: [],
     handler_sup: nil
-#    ack_timeout: nil,
   ]
   @type t :: %__MODULE__{
 #    parent: nil | pid,
     ref: Lakeland.ref,
 #    conn_type: conn_type,
 #    shutdown: shutdown,
+    ack_timeout: timeout,
     transport: module,
     protocol: module,
     protocol_opts: term,
     max_conns: Lakeland.max_conns,
     sleepers: [pid],
     handler_sup: pid
- #   ack_timeout: timeout,
-
   }
 
   @spec start_link(Lakeland.ref, conn_type, shutdown, timeout, module, module) :: GenServer.on_start
-  def start_link(ref, conn_type, _shutdown, _ack_timeout, transport, protocol) do
-    GenServer.start_link(__MODULE__, {ref, conn_type, transport, protocol})
+  def start_link(ref, conn_type, _shutdown, ack_timeout, transport, protocol) do
+    GenServer.start_link(__MODULE__, {ref, conn_type, ack_timeout, transport, protocol})
   end
 
   def start_protocol(manager, socket) do
@@ -51,8 +50,8 @@ defmodule Lakeland.Connection.Manager do
   end
 
 
-  def init({ref, conn_type, transport, protocol}) do
-    {:ok, handler_sup} = Supervisor.start_link(Lakeland.Handler.Supervisor, [protocol, conn_type])
+  def init({ref, conn_type, ack_timeout, transport, protocol}) do
+    {:ok, handler_sup} = Supervisor.start_link(Lakeland.Handler.Supervisor, {protocol, conn_type})
 
     Lakeland.Server.set_connection_sup(ref, Kernel.self)
 
@@ -60,6 +59,7 @@ defmodule Lakeland.Connection.Manager do
     protocol_opts = Lakeland.Server.get_protocol_opts(ref)
     state = %__MODULE__{
       ref: ref,
+      ack_timeout: ack_timeout,
       transport: transport,
       protocol: protocol,
       protocol_opts: protocol_opts,
@@ -73,6 +73,7 @@ defmodule Lakeland.Connection.Manager do
   def handle_call({:start_protocol, socket}, from,
                   %__MODULE__{
                     ref: ref,
+                    ack_timeout: ack_timeout,
                     transport: transport,
                     protocol: protocol,
                     protocol_opts: protocol_opts,
@@ -84,8 +85,8 @@ defmodule Lakeland.Connection.Manager do
     case handler_sup |> Supervisor.start_child([ref, socket, transport, protocol_opts]) do
       {:error, reason} = error ->
         require Logger
-        :ok = Logger.error("Lakeland listener #{ref} connection handler process start failure; " <>
-          "#{protocol}.start_link/4 crashed with reason: #{reason}\n")
+        :ok = Logger.error("Lakeland listener #{inspect ref} connection handler process start failure; " <>
+          "#{inspect protocol}.start_link/4 crashed with reason: #{inspect reason}\n")
         {:reply, error, state}
       {:ok, child} when child != :undefined ->
         # monitor the handler in order to receive exit signal to release sleeped acceptors
@@ -96,7 +97,7 @@ defmodule Lakeland.Connection.Manager do
             _res = handler_sup |> Supervisor.terminate_child(child)
             {:reply, error, state}
           :ok ->
-            Kernel.send(child, {:shoot, ref, transport, socket})
+            Kernel.send(child, {:shoot, ref, transport, socket, ack_timeout})
             if (cur_conns(handler_sup) < max_conns) do
               {:reply, :ok, state}
             else
@@ -113,7 +114,7 @@ defmodule Lakeland.Connection.Manager do
             _res = handler_sup |> Supervisor.terminate_child(child)
             {:reply, error, state}
           :ok ->
-            Kernel.send(child, {:shoot, ref, transport, socket})
+            Kernel.send(child, {:shoot, ref, transport, socket, ack_timeout})
             if (cur_conns(handler_sup) < max_conns) do
               {:reply, :ok, state}
             else

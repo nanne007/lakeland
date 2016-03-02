@@ -46,6 +46,14 @@ defmodule Lakeland do
     end
   end
 
+  @spec accept_ack(Lakeland.ref) :: :ok
+  def accept_ack(ref) do
+    receive do
+      {:shoot, ^ref, transport, socket, ack_timeout} ->
+        transport.accept_ack(socket, ack_timeout)
+    end
+  end
+
   defp child_spec(ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts) do
     import Supervisor.Spec
     listener_sup_args = [ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts]

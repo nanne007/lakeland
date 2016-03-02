@@ -196,7 +196,7 @@ defmodule Lakeland.Transport.Tcp do
     filter_user_options(tail, allowed_keys, [opt | acc])
   end
   defp filter_user_options([opt | tail], allowed_keys, acc) do
-    _ = Logger.warn("Transport options #{opt} unknown or invalid.\n")
+    _ = Logger.warn("Transport options #{inspect opt} unknown or invalid.\n")
     filter_user_options(tail, allowed_keys, acc)
   end
   defp filter_user_options([], _allowed_keys, acc), do: Enum.reverse(acc)

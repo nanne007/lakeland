@@ -14,7 +14,7 @@ defmodule Lakeland.Acceptor do
           :ok ->
             # this call will not return until process has been started
             # and we are below the maximum number of connections
-            _res = Lakeland.Connection.Supervisor.start_protocol(conn_sup, conn_socket)
+            _res = Lakeland.Connection.Manager.start_protocol(conn_sup, conn_socket)
           {:error, _} ->
             transport.close(conn_socket)
         end
@@ -41,7 +41,7 @@ defmodule Lakeland.Acceptor do
     require Logger
     receive do
       msg ->
-        :ok = Logger.error("#{__MODULE__} received unexpected message: #{msg}")
+        :ok = Logger.error("#{__MODULE__} received unexpected message: #{inspect msg}")
         flush()
     after
       0 ->

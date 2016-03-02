@@ -23,9 +23,9 @@ defmodule Lakeland.Acceptor.Supervisor do
                             socket
                           {:error, reason} ->
                             require Logger
-                            :ok = Logger.error("Failed to start listener #{ref} " <>
-                              "in #{transport}.listen(#{transport_opts}) " <>
-                              "for reason #{reason} (#{:inet.format_error(reason)})")
+                            :ok = Logger.error("Failed to start listener #{inspect ref} " <>
+                              "in #{inspect transport}.listen(#{inspect transport_opts}) " <>
+                              "for reason #{inspect reason} (#{:inet.format_error(reason)})")
                             exit({:listen_error, ref, reason})
                         end
                     end

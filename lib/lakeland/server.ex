@@ -30,6 +30,8 @@ defmodule Lakeland.Server do
     :ets.delete(@table, {:addr, ref})
     :ets.delete(@table, {:max_conns, ref})
     :ets.delete(@table, {:opts, ref})
+    # the deletion of :conn_manager is handled by monitoring,
+    # see below about the handle of `:DOWN` message.
     :ok
   end
 

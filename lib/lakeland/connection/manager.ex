@@ -63,6 +63,16 @@ defmodule Lakeland.Connection.Manager do
     manager |> GenServer.call(:active_connections)
   end
 
+  @spec set_max_connections(pid, Lakeland.max_conns) :: :ok
+  def set_max_connections(manager, max_conns) do
+    manager |> GenServer.call({:set_max_conns, max_conns})
+  end
+
+  @spec set_protocol_opts(pid, Lakeland.opts) :: :ok
+  def set_protocol_opts(manager, opts) do
+    manager |> GenServer.call({:set_protocol_opts, opts})
+  end
+
 
   def init({ref, conn_type, ack_timeout, transport, protocol}) do
     {:ok, handler_sup} = Supervisor.start_link(Lakeland.Handler.Supervisor, {protocol, conn_type})
@@ -148,6 +158,21 @@ defmodule Lakeland.Connection.Manager do
     end
   end
 
+  def handle_call({:set_max_conns, new_max_conns}, _from,
+                  %__MODULE__{max_conns: max_conns, sleepers: sleepers} = state)
+  when new_max_conns > max_conns do
+    for acceptor <- sleepers, do: Kernel.send(acceptor, Kernel.self)
+    {:reply, :ok, %{state | max_conns: new_max_conns, sleepers: []}}
+  end
+  def handle_call({:set_max_conns, new_max_conns}, _from, state) do
+    {:reply, :ok, %{state | max_conns: new_max_conns}}
+  end
+
+  def handle_call({:set_protocol_opts, new_protocol_opts}, _from, state) do
+    {:reply, :ok, %{state | protocol_opts: new_protocol_opts}}
+  end
+
+
   def handler_info({:DOWN, _ref, :process, _handler_pid, _reason},
                    %__MODULE__{
                      sleepers: sleepers
@@ -170,28 +195,4 @@ defmodule Lakeland.Connection.Manager do
     # currently, return the number of active children
     handler_sup |> Supervisor.count_children |> Map.fetch!(:active)
   end
-
-
-
-  #   @doc """
-  #   set max connections number
-  #   """
-  #   def handle_call({:set_max_conns, new_max_conns}, _from,
-  #                   %__MODULE__{max_conns: max_conns, sleepers: sleepers} = state)
-  #   when new_max_conns > max_conns do
-  #     for acceptor <- sleepers, do: Kernel.send(acceptor, Kernel.self)
-  #     {:reply, :ok, %{state | max_conns: new_max_conns, sleepers: []}}
-  #   end
-  #   def handle_call({:set_max_conns, new_max_conns}, _from, state) do
-  #     {:reply, :ok, %{state | max_conns: new_max_conns}}
-  #   end
-
-  #   @doc """
-  #   set protocol options
-  #   """
-  #   def handle_call({:set_protocol_opts, new_protocol_opts}, _from, state) do
-  #     {:reply, :ok, %{state | protocol_opts: new_protocol_opts}}
-  #   end
-  # end
-
 end

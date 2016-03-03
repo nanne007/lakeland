@@ -121,9 +121,9 @@ defmodule Lakeland.Server do
   def handle_call({:set_max_conns, ref, max_conns}, _from, state) do
     true = :ets.insert(@table, {{:max_conns, ref}, max_conns})
 
-    # change the max_conns of the corresponding connection supervisor
+    # and propagate the change to the running conn manager
     conn_sup = get_connection_sup(ref)
-    send(conn_sup, {:set_max_conns, max_conns})
+    :ok = conn_sup |> Lakeland.Connection.Manager.set_max_connections(max_conns)
 
     {:reply, :ok, state}
   end
@@ -132,7 +132,7 @@ defmodule Lakeland.Server do
     true = :ets.insert(@table, {{:opts, ref}, opts})
 
     conn_sup = get_connection_sup(ref)
-    send(conn_sup, {:set_opts, opts})
+    conn_sup |> Lakeland.Connection.Manager.set_protocol_opts(opts)
 
     {:reply, :ok, state}
   end

@@ -84,12 +84,12 @@ defmodule Lakeland.Connection.Manager do
     {:ok, state}
   end
 
-  def handle_call(:active_connections, from,
+  def handle_call(:active_connections, _from,
                   %__MODULE__{
                     handler_sup: handler_sup
                   } = state) do
     conn_num = handler_sup |> Supervisor.count_children |> Map.fetch!(:active)
-    {:reply, coun_num, state}
+    {:reply, conn_num, state}
   end
 
   def handle_call({:start_protocol, socket}, from,

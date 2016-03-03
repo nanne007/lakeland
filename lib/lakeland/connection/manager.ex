@@ -36,6 +36,11 @@ defmodule Lakeland.Connection.Manager do
     GenServer.start_link(__MODULE__, {ref, conn_type, ack_timeout, transport, protocol})
   end
 
+  @doc """
+  Given the connection `manager`, start a connection handler at given `socket`.
+  It is intended to be called from `Lakeland.Acceptor` when accepting a connection.
+  """
+  @spec start_protocol(pid, :inet.socket) :: :ok | {:error, atom}
   def start_protocol(manager, socket) do
     case manager |> GenServer.call({:start_protocol, socket}) do
       :ok -> :ok
@@ -47,6 +52,15 @@ defmodule Lakeland.Connection.Manager do
       {:error, _reason} = error ->
         error
     end
+  end
+
+  @doc """
+  Return the number of connections managed by the process.
+  It delegates to  `count_children` of the linked `Connection.Supervisor`.
+  """
+  @spec active_connections(pid) :: non_neg_integer
+  def active_connections(manager) do
+    manager |> GenServer.call(:active_connections)
   end
 
 
@@ -68,6 +82,14 @@ defmodule Lakeland.Connection.Manager do
       handler_sup: handler_sup
     }
     {:ok, state}
+  end
+
+  def handle_call(:active_connections, from,
+                  %__MODULE__{
+                    handler_sup: handler_sup
+                  } = state) do
+    conn_num = handler_sup |> Supervisor.count_children |> Map.fetch!(:active)
+    {:reply, coun_num, state}
   end
 
   def handle_call({:start_protocol, socket}, from,

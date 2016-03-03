@@ -35,13 +35,13 @@ defmodule Lakeland.Server do
 
   @spec set_connection_sup(Lakeland.ref, pid) :: :ok
   def set_connection_sup(ref, pid) do
-    true = GenServer.call(__MODULE__, {:set_connection_sup, ref, pid})
+    true = GenServer.call(__MODULE__, {:set_connection_manager, ref, pid})
     :ok
   end
 
   @spec get_connection_sup(Lakeland.ref) :: pid
   def get_connection_sup(ref) do
-    :ets.lookup_element(@table, {:conn_sup, ref}, 2)
+    :ets.lookup_element(@table, {:conn_manager, ref}, 2)
   end
 
   @spec set_addr(Lakeland.ref, {:inet.ip_address, :inet.port_number}) :: :ok
@@ -80,7 +80,7 @@ defmodule Lakeland.Server do
   @spec count_connections(Lakeland.ref) :: non_neg_integer
   def count_connections(ref) do
     conn_sup = get_connection_sup(ref)
-    Lakeland.Connection.Supervisor.active_connections(conn_sup)
+    Lakeland.Connection.Manager.active_connections(conn_sup)
   end
 
 
@@ -88,7 +88,7 @@ defmodule Lakeland.Server do
 
   def init({}) do
     # recover from ets.
-    monitors = for [ref, pid] <- :ets.match(@table, {{:conn_sup, "$1"}, "$2"}) do
+    monitors = for [ref, pid] <- :ets.match(@table, {{:conn_manager, "$1"}, "$2"}) do
       {{Process.monitor(pid), pid}, ref}
     end
 
@@ -101,8 +101,8 @@ defmodule Lakeland.Server do
     {:reply, :ok, state}
   end
 
-  def handle_call({:set_connection_sup, ref, pid}, _from, %__MODULE__{monitors: monitors} = state) do
-    case :ets.insert_new(@table, {{:conn_sup, ref}, pid}) do
+  def handle_call({:set_connection_manager, ref, pid}, _from, %__MODULE__{monitors: monitors} = state) do
+    case :ets.insert_new(@table, {{:conn_manager, ref}, pid}) do
       true ->
         monitor_ref = Process.monitor(pid)
         {:reply, true, %__MODULE__{monitors: [{{monitor_ref, pid}, ref} | monitors]}}
@@ -137,7 +137,7 @@ defmodule Lakeland.Server do
 
   def handle_info({:DOWN, monitor_ref, :process, pid, _reason}, %__MODULE__{monitors: monitors}) do
     {{_monitor_ref, _pid}, ref} = monitors |> List.keyfind({monitor_ref, pid}, 0)
-    true = :ets.delete(@table, {:conn_sup, ref})
+    true = :ets.delete(@table, {:conn_manager, ref})
     monitors = monitors |> List.keydelete({monitor_ref, pid}, 0)
     {:noreply, %__MODULE__{monitors: monitors}}
   end

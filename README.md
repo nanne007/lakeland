@@ -3,18 +3,26 @@
 ### Description
 
 Lakeland is an copycat of [Ranch](https://github.com/ninenines/ranch)(connection pool of tcp for erlang).
-For now, this repo is just for the purpose of learning elixir and erlang and any sugguestion is appreciated.
+This repo is just for the purpose of learning elixir and erlang.
+Many tests are missing, so **do not** use it in production.
 
-### What it implements.
+### What's the difference.
 
-Lakeland drop the `remove_connection` functionality of ranch.
-And use `Lakeland.Connection.Manager`(a gen_server linked with a supervisor) to manage connections. (Ranch uses a customized supervisor).
-I also adjust the `start_listener` args to my own preference.
-
+- Lakeland drops the `remove_connection` functionality of ranch,
+- And uses `Lakeland.Connection.Manager`(a gen_server that links a handler supervisor) to manage connections,
+  while ranch uses a customized supervisor.
+- The arguments of `start_listener` is changed accroding to my own preference.
+- Also, fix a bug in ranch, see ninenines/ranch#140.
 
 ### How to use
 
-The following code starts a echo server in port 8080.
+``` shell
+$ git clone https://github.com/lerencao/lakeland.git && cd lakeland
+$ mix deps.get && mix compile
+$ iex -S mix
+```
+
+Then in the iex shell, enter the following code to starts a echo server in port 8080.
 
 ``` elixir
 {:ok, _listener} = Lakeland.start_listener(:echo, Lakeland.Handler.Echo, [], [num_acceptors: 3, port: 8080])
@@ -26,11 +34,6 @@ The following code starts a echo server in port 8080.
 
 Use `telnet localhost 8080` to echo yourself.
 
-
-### How to build
-
-Lakeland is an elixir mix project.
-After cloning it, you can simply run `mix deps.get` and `mix compile`.
 To see the docs, use `mix docs`.
 
 ### License

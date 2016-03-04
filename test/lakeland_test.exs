@@ -2,32 +2,9 @@ defmodule LakelandTest do
   use ExUnit.Case
   doctest Lakeland
 
-  defmodule Echo.Handler do
-    def start_link(ref, socket, transport, opts) do
-      pid = Kernel.spawn_link(__MODULE__, :init, [ref, socket, transport, opts])
-      {:ok, pid}
-    end
-
-    def init(ref, socket, transport, _opts) do
-      :ok = Lakeland.accept_ack(ref)
-      loop(socket, transport)
-    end
-
-    defp loop(socket, transport) do
-      case transport.recv(socket, 0) do
-        {:ok, data} ->
-          transport.send(socket, data)
-          loop(socket, transport)
-        _ ->
-          :ok = transport.close(socket)
-      end
-    end
-
-  end
-
   @port 8080
   test "echo should work as it is" do
-    {:ok, child} = Lakeland.start_listener(:echo, Echo.Handler, [], [num_acceptors: 3, port: @port])
+    {:ok, child} = Lakeland.start_listener(:echo, Lakeland.Handler.Echo, [], [num_acceptors: 3, port: @port])
     children = Supervisor.which_children(Lakeland.Supervisor)
     assert children |> List.keymember?(child, 1)
 

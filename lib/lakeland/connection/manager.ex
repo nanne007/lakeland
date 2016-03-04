@@ -1,48 +1,39 @@
 defmodule Lakeland.Connection.Manager do
   use GenServer
 
-  @type conn_type :: :worker | :supervisor
-  @type shutdown :: :brutal_kill | timeout
-
   defstruct [
-#    parent: nil,
     ref: nil,
-#    conn_type: nil,
-#    shutdown: nil,
     ack_timeout: nil,
     transport: nil,
-    protocol: nil,
-    protocol_opts: nil,
+    handler: nil,
+    handler_opts: nil,
     max_conns: nil,
     sleepers: [],
     handler_sup: nil
   ]
   @type t :: %__MODULE__{
-#    parent: nil | pid,
     ref: Lakeland.ref,
-#    conn_type: conn_type,
-#    shutdown: shutdown,
     ack_timeout: timeout,
     transport: module,
-    protocol: module,
-    protocol_opts: term,
+    handler: module,
+    handler_opts: Kerword.t,
     max_conns: Lakeland.max_conns,
     sleepers: [pid],
     handler_sup: pid
   }
 
-  @spec start_link(Lakeland.ref, conn_type, shutdown, timeout, module, module) :: GenServer.on_start
-  def start_link(ref, conn_type, _shutdown, ack_timeout, transport, protocol) do
-    GenServer.start_link(__MODULE__, {ref, conn_type, ack_timeout, transport, protocol})
+  @spec start_link(Lakeland.ref, Lakeland.conn_type, Lakeland.shutdown, timeout, module, module) :: GenServer.on_start
+  def start_link(ref, conn_type, _shutdown, ack_timeout, transport, handler) do
+    GenServer.start_link(__MODULE__, {ref, conn_type, ack_timeout, transport, handler})
   end
 
   @doc """
   Given the connection `manager`, start a connection handler at given `socket`.
   It is intended to be called from `Lakeland.Acceptor` when accepting a connection.
   """
-  @spec start_protocol(pid, :inet.socket) :: :ok | {:error, atom}
-  def start_protocol(manager, socket) do
-    case manager |> GenServer.call({:start_protocol, socket}) do
+  @spec start_handler(pid, :inet.socket) :: :ok | {:error, atom}
+  def start_handler(manager, socket) do
+    case manager |> GenServer.call({:start_handler, socket}) do
       :ok -> :ok
       {:ok, :sleep} ->
         receive do
@@ -68,25 +59,25 @@ defmodule Lakeland.Connection.Manager do
     manager |> GenServer.call({:set_max_conns, max_conns})
   end
 
-  @spec set_protocol_opts(pid, Lakeland.opts) :: :ok
-  def set_protocol_opts(manager, opts) do
-    manager |> GenServer.call({:set_protocol_opts, opts})
+  @spec set_handler_opts(pid, Keyword.t) :: :ok
+  def set_handler_opts(manager, opts) do
+    manager |> GenServer.call({:set_handler_opts, opts})
   end
 
 
-  def init({ref, conn_type, ack_timeout, transport, protocol}) do
-    {:ok, handler_sup} = Supervisor.start_link(Lakeland.Handler.Supervisor, {protocol, conn_type})
+  def init({ref, conn_type, ack_timeout, transport, handler}) do
+    {:ok, handler_sup} = Supervisor.start_link(Lakeland.Handler.Supervisor, {handler, conn_type})
 
-    Lakeland.Server.set_connection_sup(ref, Kernel.self)
+    Lakeland.Server.set_connection_manager(ref, Kernel.self)
 
     max_conns = Lakeland.Server.get_max_connections(ref)
-    protocol_opts = Lakeland.Server.get_protocol_opts(ref)
+    handler_opts = Lakeland.Server.get_handler_opts(ref)
     state = %__MODULE__{
       ref: ref,
       ack_timeout: ack_timeout,
       transport: transport,
-      protocol: protocol,
-      protocol_opts: protocol_opts,
+      handler: handler,
+      handler_opts: handler_opts,
       max_conns: max_conns,
       sleepers: [],
       handler_sup: handler_sup
@@ -102,18 +93,18 @@ defmodule Lakeland.Connection.Manager do
     {:reply, conn_num, state}
   end
 
-  def handle_call({:start_protocol, socket}, from,
+  def handle_call({:start_handler, socket}, from,
                   %__MODULE__{
                     ref: ref,
                     ack_timeout: ack_timeout,
                     transport: transport,
-                    protocol: protocol,
-                    protocol_opts: protocol_opts,
+                    handler: handler,
+                    handler_opts: handler_opts,
                     max_conns: max_conns,
                     sleepers: sleepers,
                     handler_sup: handler_sup
                   } = state) do
-    res = case handler_sup |> Supervisor.start_child([ref, socket, transport, protocol_opts]) do
+    res = case handler_sup |> Supervisor.start_child([ref, socket, transport, handler_opts]) do
             {:error, _reason} = error -> error
             {:ok, child} when is_pid(child) -> {:ok, child}
             {:ok, child, _info} when is_pid(child) -> {:ok, child}
@@ -123,7 +114,7 @@ defmodule Lakeland.Connection.Manager do
      {:error, reason}  = error ->
         require Logger
         :ok = Logger.error("Lakeland listener #{inspect ref} connection handler process start failure; " <>
-          "#{inspect protocol}.start_link/4 crashed with reason: #{inspect reason}\n")
+          "#{inspect handler}.start_link/4 crashed with reason: #{inspect reason}\n")
         {:reply, error, state}
       {:ok, child} ->
         # monitor the handler in order to receive exit signal to release sleeped acceptors
@@ -156,8 +147,8 @@ defmodule Lakeland.Connection.Manager do
     {:reply, :ok, %{state | max_conns: new_max_conns}}
   end
 
-  def handle_call({:set_protocol_opts, new_protocol_opts}, _from, state) do
-    {:reply, :ok, %{state | protocol_opts: new_protocol_opts}}
+  def handle_call({:set_handler_opts, new_handler_opts}, _from, state) do
+    {:reply, :ok, %{state | handler_opts: new_handler_opts}}
   end
 
 

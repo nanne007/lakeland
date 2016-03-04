@@ -27,7 +27,7 @@ defmodule LakelandTest do
 
   @port 8080
   test "echo should work as it is" do
-    {:ok, child} = Lakeland.start_listener(Echo, 3, Lakeland.Transport.Tcp, [port: @port], Echo.Handler, [])
+    {:ok, child} = Lakeland.start_listener(:echo, Echo.Handler, [], [num_acceptors: 3, port: @port])
     children = Supervisor.which_children(Lakeland.Supervisor)
     assert children |> List.keymember?(child, 1)
 

@@ -11,7 +11,7 @@ defmodule Lakeland.ServerTest do
   test "set_new_listener_opts should work" do
     :ok = Lakeland.Server.set_new_listener_opts(TestHandler, 2048, [test: :test])
     assert 2048 == Lakeland.Server.get_max_connections(TestHandler)
-    assert [test: :test] == Lakeland.Server.get_protocol_opts(TestHandler)
+    assert [test: :test] == Lakeland.Server.get_handler_opts(TestHandler)
   end
 
   test "cleanup_listener_opts should work" do

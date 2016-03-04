@@ -20,8 +20,8 @@ defmodule Lakeland.Server do
   end
 
   @spec set_new_listener_opts(Lakeland.ref, Lakeland.max_conns, term) :: :ok
-  def set_new_listener_opts(ref, max_conns, protocol_opts) do
-    :ok = GenServer.call(__MODULE__, {:set_new_listener_opts, ref, max_conns, protocol_opts})
+  def set_new_listener_opts(ref, max_conns, handler_opts) do
+    :ok = GenServer.call(__MODULE__, {:set_new_listener_opts, ref, max_conns, handler_opts})
     :ok
   end
 
@@ -35,14 +35,14 @@ defmodule Lakeland.Server do
     :ok
   end
 
-  @spec set_connection_sup(Lakeland.ref, pid) :: :ok
-  def set_connection_sup(ref, pid) do
+  @spec set_connection_manager(Lakeland.ref, pid) :: :ok
+  def set_connection_manager(ref, pid) do
     true = GenServer.call(__MODULE__, {:set_connection_manager, ref, pid})
     :ok
   end
 
-  @spec get_connection_sup(Lakeland.ref) :: pid
-  def get_connection_sup(ref) do
+  @spec get_connection_manager(Lakeland.ref) :: pid
+  def get_connection_manager(ref) do
     :ets.lookup_element(@table, {:conn_manager, ref}, 2)
   end
 
@@ -68,21 +68,20 @@ defmodule Lakeland.Server do
     :ets.lookup_element(@table, {:max_conns, ref}, 2)
   end
 
-  @spec set_protocol_opts(Lakeland.ref, term) :: :ok
-  def set_protocol_opts(ref, opts) do
+  @spec set_handler_opts(Lakeland.ref, term) :: :ok
+  def set_handler_opts(ref, opts) do
     :ok = GenServer.call(__MODULE__, {:set_opts, ref, opts})
     :ok
   end
 
-  @spec get_protocol_opts(Lakeland.ref) :: term
-  def get_protocol_opts(ref) do
+  @spec get_handler_opts(Lakeland.ref) :: term
+  def get_handler_opts(ref) do
     :ets.lookup_element(@table, {:opts, ref}, 2)
   end
 
   @spec count_connections(Lakeland.ref) :: non_neg_integer
   def count_connections(ref) do
-    conn_sup = get_connection_sup(ref)
-    Lakeland.Connection.Manager.active_connections(conn_sup)
+    GenServer.call(__MODULE__, {:active_connections, ref})
   end
 
 
@@ -122,8 +121,8 @@ defmodule Lakeland.Server do
     true = :ets.insert(@table, {{:max_conns, ref}, max_conns})
 
     # and propagate the change to the running conn manager
-    conn_sup = get_connection_sup(ref)
-    :ok = conn_sup |> Lakeland.Connection.Manager.set_max_connections(max_conns)
+    conn_manager = get_connection_manager(ref)
+    :ok = conn_manager |> Lakeland.Connection.Manager.set_max_connections(max_conns)
 
     {:reply, :ok, state}
   end
@@ -131,11 +130,18 @@ defmodule Lakeland.Server do
   def handle_call({:set_opts, ref, opts}, _from, state) do
     true = :ets.insert(@table, {{:opts, ref}, opts})
 
-    conn_sup = get_connection_sup(ref)
-    conn_sup |> Lakeland.Connection.Manager.set_protocol_opts(opts)
+    conn_manager = get_connection_manager(ref)
+    conn_manager |> Lakeland.Connection.Manager.set_handler_opts(opts)
 
     {:reply, :ok, state}
   end
+
+  def handler_call({:active_connections, ref}, _from, state) do
+    conn_manager = get_connection_manager(ref)
+    num_conns = Lakeland.Connection.Manager.active_connections(conn_manager)
+    {:reply, num_conns, state}
+  end
+
 
   def handle_info({:DOWN, monitor_ref, :process, pid, _reason}, %__MODULE__{monitors: monitors}) do
     {{_monitor_ref, _pid}, ref} = monitors |> List.keyfind({monitor_ref, pid}, 0)

@@ -2,19 +2,19 @@
 defmodule Lakeland.Acceptor do
 
   @spec start_link(:inet.socket, module, pid) :: {:ok, pid}
-  def start_link(listen_socket, transport, conn_sup) do
-    pid = spawn_link(__MODULE__, :loop, [listen_socket, transport, conn_sup])
+  def start_link(listen_socket, transport, conn_manager) do
+    pid = spawn_link(__MODULE__, :loop, [listen_socket, transport, conn_manager])
     {:ok, pid}
   end
 
-  def loop(listen_socket, transport, conn_sup) do
+  def loop(listen_socket, transport, conn_manager) do
     case transport.accept(listen_socket, :infinity) do
       {:ok, conn_socket} ->
-        case transport.controlling_process(conn_socket, conn_sup) do
+        case transport.controlling_process(conn_socket, conn_manager) do
           :ok ->
             # this call will not return until process has been started
             # and we are below the maximum number of connections
-            _res = Lakeland.Connection.Manager.start_protocol(conn_sup, conn_socket)
+            _res = Lakeland.Connection.Manager.start_handler(conn_manager, conn_socket)
           {:error, _} ->
             transport.close(conn_socket)
         end
@@ -34,7 +34,7 @@ defmodule Lakeland.Acceptor do
 
     flush()
 
-    __MODULE__.loop(listen_socket, transport, conn_sup)
+    __MODULE__.loop(listen_socket, transport, conn_manager)
   end
 
   defp flush() do

@@ -1,17 +1,17 @@
 defmodule Lakeland.Handler.Supervisor do
   use Supervisor
 
-  def start_link(protocol, conn_type) do
-    Supervisor.start_link(__MODULE__, {protocol, conn_type})
+  def start_link(handler, conn_type) do
+    Supervisor.start_link(__MODULE__, {handler, conn_type})
   end
 
-  def init({protocol, conn_type}) do
+  def init({handler, conn_type}) do
     children = [
       case conn_type do
         :worker ->
-          worker(protocol, [], restart: :temporary)
+          worker(handler, [], restart: :temporary)
         :supervisor ->
-          supervisor(protocol, [], restart: :temporary)
+          supervisor(handler, [], restart: :temporary)
       end
     ]
     supervise_opts = [

@@ -1,27 +1,41 @@
 defmodule Lakeland.Listener.Supervisor do
   use Supervisor
 
-  @spec start_link(Lakeland.ref, non_neg_integer, module, Keyword.t, module, Keyword.t) :: Supervisor.on_start
-  def start_link(ref, num_of_acceptors, transport, transport_opts, protocol, protocol_opts) do
-    max_connections = transport_opts |> Keyword.get(:max_connections, 1024)
-    Lakeland.Server.set_new_listener_opts(ref, max_connections, protocol_opts)
+  @spec start_link(Lakeland.ref, module, Keyword.t, Keyword.t, module) :: Supervisor.on_start
+  def start_link(ref, handler, handler_opts, listener_opts, transport) do
     Supervisor.start_link(__MODULE__, {
-          ref, num_of_acceptors, transport, transport_opts, protocol
+          ref, handler, handler_opts, listener_opts, transport
     })
   end
 
 
-  def init({ref, num_of_acceptors, transport, transport_opts, protocol}) do
-    ack_timeout = transport_opts |> Keyword.get(:ack_timeout, 5000)
-    connection_type = transport_opts |> Keyword.get(:connection_type, :worker)
-    shutdown = transport_opts |> Keyword.get(:shutdown, 5000)
+  def init({ref, handler, handler_opts, listener_opts, transport}) do
+    # options for Connection.Manager
+    ack_timeout = listener_opts |> Keyword.fetch!(:ack_timeout)
+    connection_type = listener_opts |> Keyword.fetch!(:connection_type)
+    shutdown = listener_opts |> Keyword.fetch!(:shutdown)
+
+    max_connections = listener_opts |> Keyword.fetch!(:max_connections)
+    Lakeland.Server.set_new_listener_opts(ref, max_connections, handler_opts)
+
+    # options for Acceptor.Supervisor
+    num_of_acceptors = listener_opts |> Keyword.fetch!(:num_acceptors)
+    socket = listener_opts |> Keyword.get(:socket, nil)
+
+    transport_opts = listener_opts
+    |> Keyword.delete(:ack_timeout)
+    |> Keyword.delete(:connection_type)
+    |> Keyword.delete(:max_connections)
+    |> Keyword.delete(:shutdown)
+    |> Keyword.delete(:num_acceptors)
+    |> Keyword.delete(:socket)
 
     children = [
       worker(Lakeland.Connection.Manager, [
-            ref, connection_type, shutdown, ack_timeout,transport, protocol
+            ref, connection_type, shutdown, ack_timeout, transport, handler
           ]),
       supervisor(Lakeland.Acceptor.Supervisor, [
-            ref, num_of_acceptors, transport, transport_opts
+            ref, num_of_acceptors, socket, transport, transport_opts
           ])
     ]
 

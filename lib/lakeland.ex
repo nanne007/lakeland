@@ -135,11 +135,4 @@ defmodule Lakeland do
     Lakeland.Server.set_handler_opts(ref, opts)
   end
 
-
-  defp child_spec(ref, num_of_acceptors, listener_opts, transport, handler, handler_opts) do
-    import Supervisor.Spec
-    listener_sup_args = [ref, num_of_acceptors, listener_opts, transport, handler, handler_opts]
-    supervisor(Lakeland.Listener.Supervisor, listener_sup_args,
-                            id: {Lakeland.Listener.Supervisor, ref})
-  end
 end

@@ -2,12 +2,11 @@ defmodule Lakeland.Mixfile do
   use Mix.Project
 
   @dialyzer_configs [
-    plt_add_apps: [:eprof]
   ]
 
   def project do
     [app: :lakeland,
-     version: "0.0.1",
+     version: "0.1.0",
      elixir: "~> 1.2",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,

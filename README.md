@@ -16,7 +16,7 @@ I also adjust the `start_listener` args to my own preference.
 
 The following code starts a echo server in port 8080.
 
-```
+``` elixir
 {:ok, _listener} = Lakeland.start_listener(:echo, Lakeland.Handler.Echo, [], [num_acceptors: 3, port: 8080])
 :echo |> Lakeland.get_addr # => {{0, 0, 0, 0}, 8080}
 :echo |> Lakeland.get_max_connections # => 1024

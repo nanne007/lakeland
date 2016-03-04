@@ -113,48 +113,36 @@ defmodule Lakeland.Connection.Manager do
                     sleepers: sleepers,
                     handler_sup: handler_sup
                   } = state) do
+    res = case handler_sup |> Supervisor.start_child([ref, socket, transport, protocol_opts]) do
+            {:error, _reason} = error -> error
+            {:ok, child} when is_pid(child) -> {:ok, child}
+            {:ok, child, _info} when is_pid(child) -> {:ok, child}
+          end
 
-    case handler_sup |> Supervisor.start_child([ref, socket, transport, protocol_opts]) do
-      {:error, reason} = error ->
+    case res do
+     {:error, reason}  = error ->
         require Logger
         :ok = Logger.error("Lakeland listener #{inspect ref} connection handler process start failure; " <>
           "#{inspect protocol}.start_link/4 crashed with reason: #{inspect reason}\n")
         {:reply, error, state}
-      {:ok, child} when child != :undefined ->
+      {:ok, child} ->
         # monitor the handler in order to receive exit signal to release sleeped acceptors
         Process.monitor(child)
-        case transport.controlling_process(socket, child) do
-          {:error, _reason} = error ->
-            transport.close(socket)
-            _res = handler_sup |> Supervisor.terminate_child(child)
-            {:reply, error, state}
-          :ok ->
-            Kernel.send(child, {:shoot, ref, transport, socket, ack_timeout})
-            if (cur_conns(handler_sup) < max_conns) do
-              {:reply, :ok, state}
-            else
-              {:reply, {:ok, :sleep},
-               %{state | sleepers: [from|sleepers]}
-              }
-            end
-        end
-      {:ok, child, _info} when child != :undefined ->
-        Process.monitor(child)
-        case transport.controlling_process(socket, child) do
-          {:error, _reason} = error ->
-            transport.close(socket)
-            _res = handler_sup |> Supervisor.terminate_child(child)
-            {:reply, error, state}
-          :ok ->
-            Kernel.send(child, {:shoot, ref, transport, socket, ack_timeout})
-            if (cur_conns(handler_sup) < max_conns) do
-              {:reply, :ok, state}
-            else
-              {:reply, {:ok, :sleep},
-               %{state | sleepers: [from | sleepers]}
-              }
-            end
-        end
+        {resp, state} = case transport.controlling_process(socket, child) do
+                          {:error, _reason} = error ->
+                            transport.close(socket)
+                            _res = handler_sup |> Supervisor.terminate_child(child)
+                            {error, state}
+                          :ok ->
+                            Kernel.send(child, {:shoot, ref, transport, socket, ack_timeout})
+                            if (cur_conns(handler_sup) < max_conns) do
+                              {:ok, state}
+                            else
+                              # notify the caller that it should sleep
+                              {{:ok, :sleep}, %{state | sleepers: [from|sleepers]}}
+                            end
+                        end
+        {:reply, resp, state}
     end
   end
 

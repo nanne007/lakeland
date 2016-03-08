@@ -9,7 +9,7 @@ defmodule LakelandTest do
   @num_acceptors 3
 
   setup do
-    {:ok, child} = Lakeland.start_listener(@ref, @handler, @handler_opts,
+    {:ok, _child} = Lakeland.start_listener(@ref, @handler, @handler_opts,
                                            [num_acceptors: @num_acceptors, port: @port])
 
     on_exit fn ->

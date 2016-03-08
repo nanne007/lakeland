@@ -24,7 +24,10 @@ defmodule Lakeland.Connection.Manager do
 
   @spec start_link(Lakeland.ref, Lakeland.conn_type, Lakeland.shutdown, timeout, module, module) :: GenServer.on_start
   def start_link(ref, conn_type, _shutdown, ack_timeout, transport, handler) do
-    GenServer.start_link(__MODULE__, {ref, conn_type, ack_timeout, transport, handler})
+    max_conns = Lakeland.Server.get_max_connections(ref)
+    handler_opts = Lakeland.Server.get_handler_opts(ref)
+
+    GenServer.start_link(__MODULE__, {ref, conn_type, ack_timeout, max_conns, transport, handler, handler_opts})
   end
 
   @doc """
@@ -65,13 +68,10 @@ defmodule Lakeland.Connection.Manager do
   end
 
 
-  def init({ref, conn_type, ack_timeout, transport, handler}) do
+  def init({ref, conn_type, ack_timeout, max_conns, transport, handler, handler_opts}) do
+    Lakeland.Server.set_connection_manager(ref, Kernel.self)
     {:ok, handler_sup} = Supervisor.start_link(Lakeland.Handler.Supervisor, {handler, conn_type})
 
-    Lakeland.Server.set_connection_manager(ref, Kernel.self)
-
-    max_conns = Lakeland.Server.get_max_connections(ref)
-    handler_opts = Lakeland.Server.get_handler_opts(ref)
     state = %__MODULE__{
       ref: ref,
       ack_timeout: ack_timeout,

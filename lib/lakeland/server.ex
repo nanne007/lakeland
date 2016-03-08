@@ -136,7 +136,7 @@ defmodule Lakeland.Server do
     {:reply, :ok, state}
   end
 
-  def handler_call({:active_connections, ref}, _from, state) do
+  def handle_call({:active_connections, ref}, _from, state) do
     conn_manager = get_connection_manager(ref)
     num_conns = Lakeland.Connection.Manager.active_connections(conn_manager)
     {:reply, num_conns, state}

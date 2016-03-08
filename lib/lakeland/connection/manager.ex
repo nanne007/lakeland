@@ -152,14 +152,14 @@ defmodule Lakeland.Connection.Manager do
   end
 
 
-  def handler_info({:DOWN, _ref, :process, _handler_pid, _reason},
+  def handle_info({:DOWN, _ref, :process, _handler_pid, _reason},
                    %__MODULE__{
                      sleepers: sleepers
                    } = state) when length(sleepers) == 0 do
     ## TODO: report child down message
     {:noreply, state}
   end
-  def handler_info({:DOWN, _ref, :process, _handler_pid, _reason},
+  def handle_info({:DOWN, _ref, :process, _handler_pid, _reason},
                    %__MODULE__{
                      sleepers: sleepers
                    } = state) do

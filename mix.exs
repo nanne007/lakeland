@@ -36,7 +36,7 @@ defmodule Lakeland.Mixfile do
     [
       {:earmark, "~> 0.1", only: [:dev]},
       {:ex_doc, "~> 0.11", only: [:dev]},
-      {:dialyxir, "~> 0.3", only: [:dev]}
+      {:dialyxir, "~> 1.0", only: [:dev]}
     ]
   end
 end
